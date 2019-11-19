@@ -18,7 +18,7 @@ save_epoch = 10
 lr = 0.0002
 batch_size = 100
 zdim = 100
-n_classes = 23
+n_classes = 10
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
