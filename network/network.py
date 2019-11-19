@@ -52,9 +52,10 @@ class Generator(nn.Module):
 		return output
 
 class Discriminator(nn.Module):
-	def __init__(self, classes):
+	def __init__(self, classes, device):
 		super().__init__()
 		self.classes = classes
+		self.device = device
 		self.model_cls = nn.Sequential(
 			# 64
 			nn.Conv2d(in_channels=3, out_channels=128, kernel_size=4, stride=2, padding=1),
@@ -120,17 +121,18 @@ class Discriminator(nn.Module):
 	def forward(self, x):
 		# Denoiser
 		# print(x.shape)
-		x = x.to(torch.float32) + tdist.normal.Normal(torch.tensor([0.0]), torch.tensor([0.05])).rsample(x.shape).squeeze(4)
+		x = x.to(torch.float32) + tdist.normal.Normal(torch.tensor([0.0]), torch.tensor([0.05])).rsample(x.shape).squeeze(4).to(self.device)
 		output = self.model_cls(x)
 		# Get class prob
-		class_prob = nn.Sequential(
-			nn.Linear(1024*4*4, self.classes),
-			nn.LeakyReLU(negative_slope=0.2)
-			)(torch.flatten(output, start_dim=1))
+		class_prob_net = nn.Sequential(
+				nn.Linear(1024*4*4, self.classes),
+				nn.LeakyReLU(negative_slope=0.2)
+			)
+		class_prob = class_prob_net.to(self.device)(torch.flatten(output, start_dim=1))
 		recons = self.model_decoder(output)
 		return class_prob, recons
 
 def log_sum_exp(inp, axis=1):
 	m = torch.max(inp, dim=axis, keepdim=True)
-	return m.values + torch.log(torch.sum(torch.exp(inp - m.values), axis=axis))
+	return m.values + torch.log(torch.sum(torch.exp(inp - m.values), dim=axis))
 	

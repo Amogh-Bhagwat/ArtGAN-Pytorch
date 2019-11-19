@@ -4,7 +4,7 @@ import csv
 import os
 import pathlib
 import PIL
-from PIL import Image
+from PIL import Image, ImageFile
 # Code to load Wikiart Dataset 
 
 def read_file(file_name, folder):
@@ -24,6 +24,7 @@ def read_file(file_name, folder):
 
 class Dataset:
 	def __init__(self, file_name, folder, transform=None):
+		ImageFile.LOAD_TRUNCATED_IMAGES = True
 		images, labels = read_file(file_name, folder)
 		self.image_list = images
 		self.labels = labels
