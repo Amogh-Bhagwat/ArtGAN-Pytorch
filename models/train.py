@@ -88,7 +88,7 @@ for index in range(init_epoch, max_epoch):
 		with torch.no_grad():
 			samples = samples.detach().cpu()
 		img_list = vutils.make_grid(samples, nrow=10, padding=2).numpy()
-		plt.imshow(np.transpose(img_list, (1,2,0)), interpolation="nearest")
+		plt.imshow(((np.transpose(img_list, (1,2,0)) + 1.) * 127.5).astype(int), interpolation="nearest")
 		path = "../gen_images/" + str(index) + ".png"
 		plt.savefig(path)
 
