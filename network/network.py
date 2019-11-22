@@ -1,138 +1,81 @@
-import numpy as np 
 import torch
 import torch.nn as nn
-import torch.distributions as tdist
-"""
-Network definitions for generator and discriminator
-"""
+import numpy as np
 
 class Generator(nn.Module):
 	def __init__(self, in_channels):
 		super().__init__()
-		self.model_fc = nn.Sequential(
-			nn.Linear(in_channels, 512*4*4),
-			nn.BatchNorm1d(512*4*4),
-			nn.LeakyReLU(negative_slope=0.2)
-		)
-		self.model_gen = nn.Sequential(	
-			nn.UpsamplingNearest2d(scale_factor=2),
+		# Input is noise vector concatenated with lable information
+		self.in_channels = in_channels
+		self.model_znet = nn.Sequential(
+			nn.ConvTranspose2d(self.in_channels, 1024, 4, 1, 0),
+			nn.BatchNorm2d(1024),
+			nn.ReLU(negative_slope=0.2),
 
-			nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=1, padding=1),
+			nn.ConvTranspose2d(1024, 512, 4, 2, 1),
 			nn.BatchNorm2d(512),
-			nn.LeakyReLU(negative_slope=0.2),
-
-			nn.UpsamplingNearest2d(scale_factor=2),
-
-			nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(256),
-			nn.LeakyReLU(negative_slope=0.2),
-
-			nn.UpsamplingNearest2d(scale_factor=2),
-
-			nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(128),
-			nn.LeakyReLU(negative_slope=0.2),
-
-			nn.UpsamplingNearest2d(scale_factor=2),
-
-			nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(64),
-			nn.LeakyReLU(negative_slope=0.2),
-
-			nn.Conv2d(in_channels=64, out_channels=3, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(3),
-			nn.LeakyReLU(negative_slope=0.2),
+			nn.ReLU(negative_slope=0.2)			
 		)
-	def forward(self, x):
-		# x is the final concatenated vector of Normalised noise and lable information
-		output_fc = self.model_fc(x)
-		# reshape output to 512 x 4 x 4 
-		output = output_fc.view(-1, 512, 4, 4)
-		output = self.model_gen(output)
-		return output
+		self.model_decoder = nn.Sequential(
+			nn.ConvTranspose2d(512, 256, 4, 2, 1),
+			nn.BatchNorm2d(256),
+			nn.ReLU(negative_slope=0.2),
+
+			nn.ConvTranspose2d(256, 128, 4, 2, 1),
+			nn.BatchNorm2d(128),
+			nn.ReLU(negative_slope=0.2),
+
+			nn.ConvTranspose2d(128, 128, 3, 1, 1),
+			nn.BatchNorm2d(128),
+			nn.ReLU(negative_slope=0.2),
+
+			nn.ConvTranspose2d(128, 3, 4, 2, 1),
+			nn.Sigmoid()
+		)
+		# output is 64 x 64 images
+	def forward(x, only_decoder=False):
+		if only_decoder:
+			return self.model_decoder(x)
+		else:
+			out = self.model_znet(x)
+			out = self.model_decoder(out)
+			return out
 
 class Discriminator(nn.Module):
-	def __init__(self, classes, device):
+	def __init__(self, out_channels):
 		super().__init__()
-		self.classes = classes
-		self.device = device
-		self.model_cls = nn.Sequential(
-			# 64
-			nn.Conv2d(in_channels=3, out_channels=128, kernel_size=4, stride=2, padding=1),
-			nn.LeakyReLU(negative_slope=0.2),
-			nn.Dropout2d(p=0.2),
-			# 32
-			nn.Conv2d(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1),
-			nn.BatchNorm2d(256),
-			nn.LeakyReLU(negative_slope=0.2),
-			nn.Dropout2d(p=0.2),
-			# 16
-			nn.Conv2d(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1),
-			nn.BatchNorm2d(512),
-			nn.LeakyReLU(negative_slope=0.2),
-			# 8
-			nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(512),
-			nn.LeakyReLU(negative_slope=0.2),
-			nn.Dropout2d(p=0.2),
-			# 8
-			nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=4, stride=2, padding=1),
-			nn.BatchNorm2d(1024),
-			nn.LeakyReLU(negative_slope=0.2)
-			# 4 
-			# nn.Linear(1024, classes)
-			# nn.LeakyReLU(negative_slope=0.2)
-		)
+		# Input is 3 x 64 x 64 images
+		self.out_channels = out_channels
+		self.model_encoder = nn.Sequential(
+			nn.Conv2d(3, 128, 4, 2, 1),
+			nn.LeakyReLU(0.2)
 
-		self.model_decoder = nn.Sequential(
-			nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(512),
-			nn.LeakyReLU(negative_slope=0.2),
-
-			nn.UpsamplingNearest2d(scale_factor=2),
-			# 8
-			nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(256),
-			nn.LeakyReLU(negative_slope=0.2),
-
-			nn.UpsamplingNearest2d(scale_factor=2),
-			# 16
-			nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, stride=1, padding=1),
+			nn.Conv2d(128, 128, 3, 1, 1),
 			nn.BatchNorm2d(128),
-			nn.LeakyReLU(negative_slope=0.2),
+			nn.LeakyReLU(0.2),
 
-			nn.UpsamplingNearest2d(scale_factor=2),
-			# 32
-			nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(64),
-			nn.LeakyReLU(negative_slope=0.2),
+			nn.Conv2d(128, 256, 4, 2, 1),
+			nn.BatchNorm2d(256),
+			nn.LeakyReLU(0.2),
 
-			nn.UpsamplingNearest2d(scale_factor=2),
-			# 64
-			nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1),
-			nn.BatchNorm2d(32),
-			nn.LeakyReLU(negative_slope=0.2),
-
-
-			nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, stride=1, padding=1),
-			# Change to tanh actuvation function
-			nn.LeakyReLU(negative_slope=0.2)
+			nn.Conv2d(256, 512, 4, 2, 1),
+			nn.BatchNorm2d(512),
+			nn.LeakyReLU(0.2)
 		)
-	def forward(self, x):
-		# Denoiser
-		# print(x.shape)
-		x = x.to(torch.float32) + tdist.normal.Normal(torch.tensor([0.0]), torch.tensor([0.05])).rsample(x.shape).squeeze(4).to(self.device)
-		output = self.model_cls(x)
-		# Get class prob
-		class_prob_net = nn.Sequential(
-				nn.Linear(1024*4*4, self.classes),
-				nn.LeakyReLU(negative_slope=0.2)
-			)
-		class_prob = class_prob_net.to(self.device)(torch.flatten(output, start_dim=1))
-		recons = self.model_decoder(output)
-		return class_prob, recons
+		self.model_cls = nn.Sequential(
+			nn.Conv2d(512, 1024, 4, 2, 1),
+			nn.BatchNorm2d(1024),
+			nn.LeakyReLU(0.2),
 
-def log_sum_exp(inp, axis=1):
-	m = torch.max(inp, dim=axis, keepdim=True)
-	return m.values + torch.log(torch.sum(torch.exp(inp - m.values), dim=axis))
-	
+			nn.Flatten(),
+
+			nn.Linear(4 * 4 * 1024, out_channels)
+		)
+	def forward(x, only_encoder=False):
+		if only_encoder:
+			return self.model_encoder(x)
+		else:
+			out = self.model_encoder(x)
+			out = self.model_cls(out)
+			return out
+			
