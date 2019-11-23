@@ -41,7 +41,8 @@ class Generator(nn.Module):
 
 			nn.Conv2d(in_channels=64, out_channels=3, kernel_size=3, stride=1, padding=1),
 			nn.BatchNorm2d(3),
-			nn.LeakyReLU(negative_slope=0.2)  # change the activation function to tanh 
+			# nn.LeakyReLU(negative_slope=0.2)  # change the activation function to tanh
+			nn.Tanh() 
 		)
 	def forward(self, x):
 		# x is the final concatenated vector of Normalised noise and lable information
@@ -116,7 +117,8 @@ class Discriminator(nn.Module):
 
 			nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, stride=1, padding=1),
 			# Change to tanh actuvation function
-			nn.LeakyReLU(negative_slope=0.2)
+			# nn.LeakyReLU(negative_slope=0.2)
+			nn.Tanh()
 		)
 	def forward(self, x):
 		# Denoiser
@@ -126,7 +128,8 @@ class Discriminator(nn.Module):
 		# Get class prob
 		class_prob_net = nn.Sequential(
 				nn.Linear(1024*4*4, self.classes),
-				nn.LeakyReLU(negative_slope=0.2)
+				# nn.LeakyReLU(negative_slope=0.2)
+				nn.Sigmoid()
 			)
 		class_prob = class_prob_net.to(self.device)(torch.flatten(output, start_dim=1))
 		recons = self.model_decoder(output)

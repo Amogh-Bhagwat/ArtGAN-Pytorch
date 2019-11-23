@@ -8,6 +8,7 @@ from torch.nn.functional import one_hot
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import torchvision.utils as vutils
+import torch.nn.functional as F
 
 # Parameters
 init_epoch = 0 
@@ -15,7 +16,7 @@ max_epoch = 100
 store_image_epoch = 10
 save_epoch = 10
 
-lr = 0.0002
+lr = 0.001
 batch_size = 100
 zdim = 100
 n_classes = 10
@@ -44,6 +45,7 @@ for index in range(init_epoch, max_epoch):
 		# Define input variables 
 		x_n = torch.tensor(np.array(data[0], dtype=np.float32), device=device)
 		y = torch.tensor(np.array(data[1], dtype=np.float32), device=device)
+		y_one_hot = one_hot(y.to(torch.int64), n_classes)
 		batch_size = y.size()[0]
 		z = torch.FloatTensor(batch_size, zdim).uniform_(-1, 1).to(device)
 		# iny - one-hot encoded tensor for class labels
@@ -57,7 +59,7 @@ for index in range(init_epoch, max_epoch):
 		# Define generator and discriminator loss
 		lreal = log_sum_exp(pred_n)
 		lfake = log_sum_exp(pred_g)
-		cost_pred_n = nn.CrossEntropyLoss(reduction='mean')(pred_n, y.to(torch.int64))
+		cost_pred_n = F.binary_cross_entropy(pred_n, y_one_hot.to(torch.float32))
 		cost_recons_n = torch.mean((recons_n - x_n) ** 2) * 0.5
 		cost_recons_g = torch.mean((recons_g - samples) ** 2) * 0.5 
 		cost_dis_n = -torch.mean(lreal) + torch.mean(nn.Softplus()(lreal))
@@ -65,14 +67,15 @@ for index in range(init_epoch, max_epoch):
 		cost_dis = cost_dis_n + cost_dis_gen_fake + cost_pred_n + cost_recons_n
 
 		cost_dis_g = -torch.mean(lfake) + torch.mean(nn.Softplus()(lfake))
-		cost_pred_g = nn.CrossEntropyLoss(reduction='mean')(pred_g, torch.argmax(torch.tensor(iny), dim=1))   ### Problem in calculating this loss 
+		cost_pred_g = F.binary_cross_entropy(pred_g, iny)
 		cost_gen = cost_dis_g + cost_pred_g + cost_recons_g
 
 		d_optimizer.zero_grad()
-		g_optimizer.zero_grad()
 
 		cost_dis.backward(retain_graph=True)
 		d_optimizer.step()
+
+		g_optimizer.zero_grad()
 
 		cost_gen.backward()
 		g_optimizer.step()
@@ -89,7 +92,7 @@ for index in range(init_epoch, max_epoch):
 			samples = samples.detach().cpu()
 		img_list = vutils.make_grid(samples, nrow=10, padding=2).numpy()
 		plt.imshow(((np.transpose(img_list, (1,2,0)) + 1.) * 127.5).astype(int), interpolation="nearest")
-		path = "../gen_images/" + str(index) + ".png"
+		path = "../gen_images/artgan_ae" + str(index) + ".png"
 		plt.savefig(path)
 
 # Save loss data for plots
