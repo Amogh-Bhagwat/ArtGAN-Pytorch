@@ -1,5 +1,5 @@
 import torch
-import numpy
+import numpy as np
 import sys
 sys.path.insert(1, '../network')
 from data_loader_cifar10 import get_dataset
@@ -12,7 +12,6 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 root = "../data/"
-train_loader = get_dataset(root, batch_size)
 
 z_dim = 100
 n_classes = 10
@@ -23,6 +22,8 @@ save_epoch = 10
 in_channels = z_dim + n_classes
 out_channels = n_classes + 1 # for fake class 
 lr_init = 0.001
+
+train_loader = get_dataset(root, batch_size)
 
 gen = Generator(in_channels).to(device)
 dis = Discriminator(out_channels).to(device)
@@ -44,11 +45,12 @@ for index in range(init_epoch, max_epoch):
 		# Define input variables
 		x_n = torch.tensor(np.array(data[0], dtype=np.float32), device=device)
 		y = torch.tensor(np.array(data[1], dtype=np.float32), device=device)
-		y_one_hot = F.one_hot(y.to(torch.int32), n_classes + 1)
+		y_one_hot = F.one_hot(y.to(torch.int64), n_classes + 1)
 		batch_size = y.size()[0]
 		y_fake = torch.tensor(np.full((1, batch_size), n_classes + 1), device=device)
-		y_fake_one_hot = F.one_hot(y.to(torch.int32), n_classes + 1)
-		z = torch.FloatTensor(batch_size, zdim).uniform_(-1, 1).to(device)
+		y_fake_one_hot = F.one_hot(y.to(torch.int64), n_classes + 1)
+		z = torch.FloatTensor(batch_size, z_dim).uniform_(-1, 1).to(device)
+		iny = torch.tensor(np.tile(np.eye(n_classes, dtype=np.float32), [int(batch_size / n_classes + 1), 1])[:batch_size, :], device=device)		
 		gen_inp = torch.cat((z, iny), dim=1)
 
 		pred_real = dis.forward(x_n, only_encoder=False)
@@ -56,17 +58,17 @@ for index in range(init_epoch, max_epoch):
 		pred_fake = dis.forward(fake_imgs, only_encoder=False)
 
 		# Define discriminator loss and update discriminator
-		loss_real = F.binary_cross_entropy(pred_real, y_one_hot)
-		loss_fake = F.binary_cross_entropy(pred_fake, y_fake_one_hot)
+		loss_real = F.binary_cross_entropy(pred_real, y_one_hot.to(torch.float32))
+		loss_fake = F.binary_cross_entropy(pred_fake, y_fake_one_hot.to(torch.float32))
 		loss_dis = loss_fake + loss_real
 		d_optimizer.zero_grad()
-		loss_dis.backward()
+		loss_dis.backward(retain_graph=True) 
 		d_optimizer.step()
 
 		# Define adversarial loss
 		zeros = torch.tensor(np.full((batch_size, 1), 0), device=device)
-		y_fake_loss = torch.cat((iny, zeros), dim=1)
-		loss_gen_fake = F.binary_cross_entropy(pred_fake, y_fake_loss)
+		y_fake_loss = torch.cat((iny, zeros.to(torch.float32)), dim=1)
+		loss_gen_fake = F.binary_cross_entropy(pred_fake, y_fake_loss.to(torch.float32))
 		# Reconstruction and l2 loss
 		recons = gen.forward(dis.forward(x_n, only_encoder=True), only_decoder=True)
 		loss_l2 = torch.mean((recons - x_n) ** 2)

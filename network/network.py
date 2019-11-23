@@ -2,6 +2,13 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+
+class Flatten(torch.nn.Module):
+    def forward(self, x):
+        batch_size = x.shape[0]
+        return x.view(batch_size, -1)
+
+
 class Generator(nn.Module):
 	def __init__(self, in_channels):
 		super().__init__()
@@ -10,33 +17,37 @@ class Generator(nn.Module):
 		self.model_znet = nn.Sequential(
 			nn.ConvTranspose2d(self.in_channels, 1024, 4, 1, 0),
 			nn.BatchNorm2d(1024),
-			nn.ReLU(negative_slope=0.2),
+			nn.ReLU(),
 
 			nn.ConvTranspose2d(1024, 512, 4, 2, 1),
 			nn.BatchNorm2d(512),
-			nn.ReLU(negative_slope=0.2)			
+			nn.ReLU()			
 		)
 		self.model_decoder = nn.Sequential(
 			nn.ConvTranspose2d(512, 256, 4, 2, 1),
 			nn.BatchNorm2d(256),
-			nn.ReLU(negative_slope=0.2),
+			nn.ReLU(),
 
 			nn.ConvTranspose2d(256, 128, 4, 2, 1),
 			nn.BatchNorm2d(128),
-			nn.ReLU(negative_slope=0.2),
+			nn.ReLU(),
 
 			nn.ConvTranspose2d(128, 128, 3, 1, 1),
 			nn.BatchNorm2d(128),
-			nn.ReLU(negative_slope=0.2),
+			nn.ReLU(),
 
 			nn.ConvTranspose2d(128, 3, 4, 2, 1),
 			nn.Sigmoid()
 		)
 		# output is 64 x 64 images
-	def forward(x, only_decoder=False):
+	def forward(self, x, only_decoder=False):
 		if only_decoder:
 			return self.model_decoder(x)
 		else:
+			# reshape x to batch_size x num_channels x 1 x 1
+			batch_size = x.shape[0]
+			num_channels = x.shape[1]
+			x = x.view(batch_size, num_channels, 1, 1)
 			out = self.model_znet(x)
 			out = self.model_decoder(out)
 			return out
@@ -48,7 +59,7 @@ class Discriminator(nn.Module):
 		self.out_channels = out_channels
 		self.model_encoder = nn.Sequential(
 			nn.Conv2d(3, 128, 4, 2, 1),
-			nn.LeakyReLU(0.2)
+			nn.LeakyReLU(0.2),
 
 			nn.Conv2d(128, 128, 3, 1, 1),
 			nn.BatchNorm2d(128),
@@ -67,11 +78,12 @@ class Discriminator(nn.Module):
 			nn.BatchNorm2d(1024),
 			nn.LeakyReLU(0.2),
 
-			nn.Flatten(),
+			Flatten(),
 
-			nn.Linear(4 * 4 * 1024, out_channels)
+			nn.Linear(4 * 4 * 1024, out_channels),
+			nn.Sigmoid()
 		)
-	def forward(x, only_encoder=False):
+	def forward(self, x, only_encoder=False):
 		if only_encoder:
 			return self.model_encoder(x)
 		else:
