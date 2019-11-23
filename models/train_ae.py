@@ -12,11 +12,11 @@ import torch.nn.functional as F
 
 # Parameters
 init_epoch = 0 
-max_epoch = 100
+max_epoch = 10
 store_image_epoch = 10
-save_epoch = 10
+save_epoch = 1
 
-lr = 0.0002
+lr_init = 0.002
 batch_size = 128
 zdim = 100
 n_classes = 10
@@ -34,14 +34,19 @@ train_loader = get_dataset(root, batch_size)
 gen = Generator(in_channels=zdim+n_classes).to(device)
 dis = Discriminator(classes=n_classes + 1, device=device).to(device) # Additional fake class
 
-d_optimizer = torch.optim.RMSprop(dis.parameters(), lr=lr)
-g_optimizer = torch.optim.RMSprop(gen.parameters(), lr=lr)
+d_optimizer = torch.optim.RMSprop(dis.parameters(), lr=lr_init)
+g_optimizer = torch.optim.RMSprop(gen.parameters(), lr=lr_init)
 
 gen_loss = []
 dis_loss = []
 
 for index in range(init_epoch, max_epoch):
 	for i, data in enumerate(train_loader):
+		if index >= 8:
+			for g in g_optimizer.param_groups:
+				g['lr'] = lr_init / 10
+			for g in d_optimizer.param_groups:
+				g['lr'] = lr_init / 10
 		# Define input variables 
 		x_n = torch.tensor(np.array(data[0], dtype=np.float32), device=device)
 		y = torch.tensor(np.array(data[1], dtype=np.float32), device=device)
@@ -56,14 +61,15 @@ for index in range(init_epoch, max_epoch):
 
 		pred_n, recons_n = dis.forward(x_n)
 		samples = gen.forward(gen_inp)
+		# print(samples)
 		pred_g, recons_g = dis.forward(samples)
 
 		# Define generator and discriminator loss
 		# lreal = log_sum_exp(pred_n)
 		# lfake = log_sum_exp(pred_g)
 		cost_pred_n = F.binary_cross_entropy(pred_n, y_one_hot.to(torch.float32)) # cost for real image prediction
-		cost_recons_n = torch.mean((recons_n - x_n) ** 2) * 0.5				      # reconstruction losses 
-		cost_recons_g = torch.mean((recons_g - samples) ** 2) * 0.5 
+		cost_recons_n = torch.mean((recons_n - x_n) ** 2)			      # reconstruction losses 
+		cost_recons_g = torch.mean((recons_g - samples) ** 2)  
 		cost_pred_f = F.binary_cross_entropy(pred_g, y_fake_one_hot.to(torch.float32))
 		# cost_dis_n = -torch.mean(lreal) + torch.mean(nn.Softplus()(lreal))
 		# cost_dis_gen_fake = torch.mean(nn.Softplus()(lfake))

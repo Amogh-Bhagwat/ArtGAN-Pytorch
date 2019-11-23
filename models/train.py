@@ -56,7 +56,7 @@ for index in range(init_epoch, max_epoch):
 		pred_real = dis.forward(x_n, only_encoder=False)
 		fake_imgs = gen.forward(gen_inp, only_decoder=False)
 		pred_fake = dis.forward(fake_imgs, only_encoder=False)
-
+		print(fake_imgs)
 		# Define discriminator loss and update discriminator
 		loss_real = F.binary_cross_entropy(pred_real, y_one_hot.to(torch.float32))
 		loss_fake = F.binary_cross_entropy(pred_fake, y_fake_one_hot.to(torch.float32))
