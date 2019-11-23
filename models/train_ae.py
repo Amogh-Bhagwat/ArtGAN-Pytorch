@@ -16,8 +16,8 @@ max_epoch = 100
 store_image_epoch = 10
 save_epoch = 10
 
-lr = 0.001
-batch_size = 100
+lr = 0.0002
+batch_size = 128
 zdim = 100
 n_classes = 10
 
@@ -51,8 +51,8 @@ for index in range(init_epoch, max_epoch):
 		# iny - one-hot encoded tensor for class labels
 		iny = torch.tensor(np.tile(np.eye(n_classes, dtype=np.float32), [int(batch_size / n_classes + 1), 1])[:batch_size, :], device=device)
 		gen_inp = torch.cat((z, iny), dim=1)
-		y_fake = torch.tensor(np.full((1, batch_size), n_classes + 1), device=device)
-		y_fake_one_hot = one_hot(y.to(torch.int64), n_classes + 1)
+		y_fake = torch.tensor(np.full((1, batch_size), n_classes), device=device)
+		y_fake_one_hot = one_hot(y_fake.to(torch.int64), n_classes + 1)
 
 		pred_n, recons_n = dis.forward(x_n)
 		samples = gen.forward(gen_inp)

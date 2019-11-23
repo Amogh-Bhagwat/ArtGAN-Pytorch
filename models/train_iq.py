@@ -3,7 +3,7 @@ import numpy as np
 import sys
 sys.path.insert(1, '../network')
 from data_loader_cifar10 import get_dataset
-from network import Generator, Discriminator
+from network_iq import Generator, Discriminator
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import torchvision.utils as vutils
@@ -54,7 +54,7 @@ for index in range(init_epoch, max_epoch):
 		gen_inp = torch.cat((z, iny), dim=1)
 
 		pred_real = dis.forward(x_n, only_encoder=False)
-		fake_imgs = gen.forward(gen_inp, only_decoder=False)
+		fake_imgs, fake_imgs_128 = gen.forward(gen_inp, only_decoder=False)
 		pred_fake = dis.forward(fake_imgs, only_encoder=False)
 
 		# Define discriminator loss and update discriminator
@@ -80,21 +80,21 @@ for index in range(init_epoch, max_epoch):
 		print('Epoch:{}, Iter:{}, G_loss={}, D_loss={}'.format(index, i, loss_gen.item(), loss_dis.item()))
 
 	if index % save_epoch == 0 or index == max_epoch -1:
-		path = "../saved_models/artgan_" + str(index)
+		path = "../saved_models/artgan_iq" + str(index)
 		torch.save(gen.state_dict(), path)
 
 		# Save images from generator
 		with torch.no_grad():
-			samples = fake_imgs.detach().cpu()
+			samples = fake_imgs_128.detach().cpu()
 		img_list = vutils.make_grid(samples, nrow=10, padding=2).numpy()
 		plt.imshow(((np.transpose(img_list, (1,2,0)) + 1.) * 127.5).astype(int), interpolation="nearest")
-		path = "../gen_images/artgan" + str(index) + ".png"
+		path = "../gen_images/artgan_iq" + str(index) + ".png"
 		plt.savefig(path)
 
 
-with open('gen_loss_artgan.txt', 'w') as f:
+with open('gen_loss_artgan_iq.txt', 'w') as f:
     for item in loss_gen:
         f.write("%s\n" % item)
-with open('dis_loss_artgan.txt', 'w') as f:
+with open('dis_loss_artgan_iq.txt', 'w') as f:
     for item in loss_dis:
         f.write("%s\n" % item)
